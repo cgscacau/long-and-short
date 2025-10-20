@@ -5,6 +5,9 @@ streamlit==1.40.2
 pandas==2.2.3
 numpy==2.2.1
 
+# Scientific Computing
+scipy==1.14.1
+
 # Statistical Analysis
 statsmodels==0.14.4
 
