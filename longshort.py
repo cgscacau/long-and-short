@@ -23,35 +23,30 @@ Analise estratégias de Long & Short com ações brasileiras.
 Selecione os ativos, período e visualize correlações, retornos e performance da estratégia.
 """)
 
+# Funções auxiliares para estilização
+def color_negative_red(val):
+    """Colorir valores negativos de vermelho e positivos de verde."""
+    try:
+        color = 'red' if float(val) < 0 else 'green'
+        return f'color: {color}'
+    except:
+        return ''
+
+def highlight_max(s):
+    """Destacar o valor máximo em uma série."""
+    is_max = s == s.max()
+    return ['background-color: lightgreen' if v else '' for v in is_max]
+
+def highlight_min(s):
+    """Destacar o valor mínimo em uma série."""
+    is_min = s == s.min()
+    return ['background-color: lightcoral' if v else '' for v in is_min]
+
 # Funções auxiliares para download de dados
 
 def download_from_investing(ticker, start_date, end_date):
-    """
-    Tenta baixar dados do Investing.com via scraping
-    """
+    """Tenta baixar dados do Yahoo Finance via requests."""
     try:
-        # Mapeamento de tickers B3 para Investing.com
-        ticker_map = {
-            'PETR4.SA': 'PETR4',
-            'VALE3.SA': 'VALE3',
-            'ITUB4.SA': 'ITUB4',
-            'BBDC4.SA': 'BBDC4',
-            'ABEV3.SA': 'ABEV3',
-            'ELET3.SA': 'ELET3',
-            'BBAS3.SA': 'BBAS3',
-            'WEGE3.SA': 'WEGE3',
-            'RADL3.SA': 'RADL3',
-            'LREN3.SA': 'LREN3',
-            'MGLU3.SA': 'MGLU3',
-            'SUZB3.SA': 'SUZB3',
-            'JBSS3.SA': 'JBSS3',
-            'B3SA3.SA': 'B3SA3',
-            'RENT3.SA': 'RENT3'
-        }
-        
-        clean_ticker = ticker_map.get(ticker, ticker.replace('.SA', ''))
-        
-        # URL do Yahoo Finance com formato CSV
         url = f"https://query1.finance.yahoo.com/v7/finance/download/{ticker}"
         params = {
             'period1': int(start_date.timestamp()),
@@ -81,27 +76,18 @@ def download_from_investing(ticker, start_date, end_date):
     return None
 
 def download_from_brapi(ticker, start_date, end_date):
-    """
-    Baixa dados da API brasileira brapi.dev (gratuita)
-    """
+    """Baixa dados da API brasileira brapi.dev."""
     try:
         clean_ticker = ticker.replace('.SA', '')
         
-        # Formatar datas
-        start_str = start_date.strftime('%Y-%m-%d')
-        end_str = end_date.strftime('%Y-%m-%d')
-        
-        # URL da API brapi
         url = f"https://brapi.dev/api/quote/{clean_ticker}"
         params = {
-            'range': '1y',  # Pode ajustar conforme necessário
+            'range': '1y',
             'interval': '1d',
             'fundamental': 'false'
         }
         
-        headers = {
-            'User-Agent': 'Mozilla/5.0'
-        }
+        headers = {'User-Agent': 'Mozilla/5.0'}
         
         response = requests.get(url, params=params, headers=headers, timeout=10)
         
@@ -114,13 +100,11 @@ def download_from_brapi(ticker, start_date, end_date):
                 if 'historicalDataPrice' in result:
                     hist_data = result['historicalDataPrice']
                     
-                    # Converter para DataFrame
                     df = pd.DataFrame(hist_data)
                     df['date'] = pd.to_datetime(df['date'], unit='s')
                     df.set_index('date', inplace=True)
                     df = df.sort_index()
                     
-                    # Filtrar pelo período
                     df = df[(df.index >= pd.Timestamp(start_date)) & (df.index <= pd.Timestamp(end_date))]
                     
                     if not df.empty and 'close' in df.columns:
@@ -132,74 +116,39 @@ def download_from_brapi(ticker, start_date, end_date):
     return None
 
 def download_synthetic_data(ticker, start_date, end_date):
-    """
-    Gera dados sintéticos realistas para demonstração
-    """
+    """Gera dados sintéticos realistas para demonstração."""
     try:
-        # Número de dias
-        days = (end_date - start_date).days
+        dates = pd.date_range(start=start_date, end=end_date, freq='B')
         
-        # Gerar datas
-        dates = pd.date_range(start=start_date, end=end_date, freq='B')  # Business days
-        
-        # Preço inicial baseado no ticker
         ticker_prices = {
-            'PETR4.SA': 35.0,
-            'VALE3.SA': 65.0,
-            'ITUB4.SA': 25.0,
-            'BBDC4.SA': 15.0,
-            'ABEV3.SA': 12.0,
-            'ELET3.SA': 40.0,
-            'BBAS3.SA': 30.0,
-            'WEGE3.SA': 45.0,
-            'RADL3.SA': 25.0,
-            'LREN3.SA': 18.0,
-            'MGLU3.SA': 3.0,
-            'SUZB3.SA': 50.0,
-            'JBSS3.SA': 30.0,
-            'B3SA3.SA': 12.0,
-            'RENT3.SA': 60.0
+            'PETR4.SA': 35.0, 'VALE3.SA': 65.0, 'ITUB4.SA': 25.0,
+            'BBDC4.SA': 15.0, 'ABEV3.SA': 12.0, 'ELET3.SA': 40.0,
+            'BBAS3.SA': 30.0, 'WEGE3.SA': 45.0, 'RADL3.SA': 25.0,
+            'LREN3.SA': 18.0, 'MGLU3.SA': 3.0, 'SUZB3.SA': 50.0,
+            'JBSS3.SA': 30.0, 'B3SA3.SA': 12.0, 'RENT3.SA': 60.0
         }
         
         initial_price = ticker_prices.get(ticker, 50.0)
         
-        # Parâmetros de volatilidade por setor
         volatility_map = {
-            'PETR4.SA': 0.025,  # Petróleo - alta volatilidade
-            'VALE3.SA': 0.022,  # Mineração - alta volatilidade
-            'ITUB4.SA': 0.015,  # Banco - média volatilidade
-            'BBDC4.SA': 0.015,  # Banco - média volatilidade
-            'ABEV3.SA': 0.012,  # Bebidas - baixa volatilidade
-            'ELET3.SA': 0.020,  # Energia - média volatilidade
-            'BBAS3.SA': 0.015,  # Banco - média volatilidade
-            'WEGE3.SA': 0.018,  # Industrial - média volatilidade
-            'RADL3.SA': 0.014,  # Varejo farmacêutico - baixa volatilidade
-            'LREN3.SA': 0.020,  # Varejo - média/alta volatilidade
-            'MGLU3.SA': 0.035,  # E-commerce - muito alta volatilidade
-            'SUZB3.SA': 0.022,  # Papel e celulose - alta volatilidade
-            'JBSS3.SA': 0.020,  # Alimentos - média volatilidade
-            'B3SA3.SA': 0.018,  # Bolsa - média volatilidade
-            'RENT3.SA': 0.016   # Locação - média volatilidade
+            'PETR4.SA': 0.025, 'VALE3.SA': 0.022, 'ITUB4.SA': 0.015,
+            'BBDC4.SA': 0.015, 'ABEV3.SA': 0.012, 'ELET3.SA': 0.020,
+            'BBAS3.SA': 0.015, 'WEGE3.SA': 0.018, 'RADL3.SA': 0.014,
+            'LREN3.SA': 0.020, 'MGLU3.SA': 0.035, 'SUZB3.SA': 0.022,
+            'JBSS3.SA': 0.020, 'B3SA3.SA': 0.018, 'RENT3.SA': 0.016
         }
         
         volatility = volatility_map.get(ticker, 0.02)
         
-        # Gerar retornos com tendência leve
-        np.random.seed(hash(ticker) % 2**32)  # Seed baseado no ticker para consistência
+        np.random.seed(hash(ticker) % 2**32)
         
-        # Adicionar tendência sutil (drift)
-        drift = 0.0003  # 0.03% ao dia em média
-        
+        drift = 0.0003
         returns = np.random.normal(drift, volatility, len(dates))
         
-        # Adicionar autocorrelação (efeito momentum)
         for i in range(1, len(returns)):
             returns[i] = 0.1 * returns[i-1] + 0.9 * returns[i]
         
-        # Calcular preços
         prices = initial_price * np.exp(np.cumsum(returns))
-        
-        # Criar Series
         price_series = pd.Series(prices, index=dates, name=ticker)
         
         return price_series
@@ -209,9 +158,7 @@ def download_synthetic_data(ticker, start_date, end_date):
 
 @st.cache_data(ttl=3600, show_spinner=False)
 def download_stock_data_multi_source(tickers, start_date, end_date, use_synthetic=False):
-    """
-    Tenta baixar dados de múltiplas fontes com fallback
-    """
+    """Tenta baixar dados de múltiplas fontes com fallback."""
     all_data = {}
     failed_tickers = []
     
@@ -227,7 +174,6 @@ def download_stock_data_multi_source(tickers, start_date, end_date, use_syntheti
         data = None
         
         if not use_synthetic:
-            # Método 1: Yahoo Finance com requests direto
             status_text.text(f"📥 {ticker} - Tentando Yahoo Finance... ({idx + 1}/{total_tickers})")
             data = download_from_investing(ticker, start_date, end_date)
             
@@ -238,7 +184,6 @@ def download_stock_data_multi_source(tickers, start_date, end_date, use_syntheti
             
             time.sleep(1)
             
-            # Método 2: API brapi.dev
             status_text.text(f"📥 {ticker} - Tentando API brasileira... ({idx + 1}/{total_tickers})")
             data = download_from_brapi(ticker, start_date, end_date)
             
@@ -249,14 +194,13 @@ def download_stock_data_multi_source(tickers, start_date, end_date, use_syntheti
             
             time.sleep(1)
         
-        # Método 3: Dados sintéticos (sempre disponível)
         status_text.text(f"📥 {ticker} - Gerando dados sintéticos... ({idx + 1}/{total_tickers})")
         data = download_synthetic_data(ticker, start_date, end_date)
         
         if data is not None and len(data) > 0:
             all_data[ticker] = data
             if not use_synthetic:
-                st.info(f"ℹ️ Usando dados sintéticos para {ticker} (dados reais indisponíveis)")
+                st.info(f"ℹ️ Usando dados sintéticos para {ticker}")
         else:
             failed_tickers.append(ticker)
             st.warning(f"⚠️ Não foi possível obter dados para {ticker}")
@@ -267,13 +211,8 @@ def download_stock_data_multi_source(tickers, start_date, end_date, use_syntheti
     if not all_data:
         return None, failed_tickers
     
-    # Combinar dados em um DataFrame
     df = pd.DataFrame(all_data)
-    
-    # Remover linhas com muitos NaN
     df = df.dropna(thresh=len(df.columns) * 0.5)
-    
-    # Forward fill para preencher gaps pequenos
     df = df.ffill(limit=5)
     
     return df, failed_tickers
@@ -352,26 +291,18 @@ st.sidebar.subheader("🔧 Fonte de Dados")
 data_mode = st.sidebar.radio(
     "Escolha a fonte:",
     ["Tentar dados reais (pode falhar)", "Usar dados sintéticos (sempre funciona)"],
-    help="Dados sintéticos são gerados algoritmicamente para demonstração"
+    help="Dados sintéticos são gerados algoritmicamente"
 )
 
 use_synthetic = data_mode == "Usar dados sintéticos (sempre funciona)"
 
 if use_synthetic:
-    st.sidebar.info("ℹ️ Modo demonstração ativado. Os dados são gerados algoritmicamente com características realistas de mercado.")
+    st.sidebar.info("ℹ️ Modo demonstração ativado.")
 
-# Lista de ações brasileiras populares
+# Lista de ações
 default_stocks = [
-    'PETR4.SA',   # Petrobras PN
-    'VALE3.SA',   # Vale ON
-    'ITUB4.SA',   # Itaú PN
-    'BBDC4.SA',   # Bradesco PN
-    'ABEV3.SA',   # Ambev ON
-    'ELET3.SA',   # Eletrobras ON
-    'BBAS3.SA',   # Banco do Brasil ON
-    'WEGE3.SA',   # WEG ON
-    'RADL3.SA',   # Raia Drogasil ON
-    'LREN3.SA'    # Lojas Renner ON
+    'PETR4.SA', 'VALE3.SA', 'ITUB4.SA', 'BBDC4.SA', 'ABEV3.SA',
+    'ELET3.SA', 'BBAS3.SA', 'WEGE3.SA', 'RADL3.SA', 'LREN3.SA'
 ]
 
 # Seleção de ativos
@@ -383,16 +314,14 @@ if use_custom:
     custom_input = st.sidebar.text_area(
         "Digite os tickers (um por linha):",
         value="PETR4.SA\nVALE3.SA\nITUB4.SA",
-        height=150,
-        help="Digite cada ticker em uma nova linha"
+        height=150
     )
     selected_stocks = [t.strip().upper() for t in custom_input.split('\n') if t.strip()]
 else:
     selected_stocks = st.sidebar.multiselect(
         "Escolha os ativos:",
         options=default_stocks,
-        default=['PETR4.SA', 'VALE3.SA', 'ITUB4.SA'],
-        help="Selecione pelo menos 2 ativos"
+        default=['PETR4.SA', 'VALE3.SA', 'ITUB4.SA']
     )
 
 # Período de análise
@@ -421,11 +350,8 @@ if period_preset == "Customizado":
 else:
     end_date = datetime.now().date()
     period_map = {
-        "1 Mês": 30,
-        "3 Meses": 90,
-        "6 Meses": 180,
-        "1 Ano": 365,
-        "2 Anos": 730
+        "1 Mês": 30, "3 Meses": 90, "6 Meses": 180,
+        "1 Ano": 365, "2 Anos": 730
     }
     start_date = end_date - timedelta(days=period_map[period_preset])
 
@@ -433,42 +359,23 @@ if start_date >= end_date:
     st.sidebar.error("❌ Data inicial deve ser anterior à data final!")
     st.stop()
 
-# Configurações da estratégia Long & Short
+# Configurações da estratégia
 st.sidebar.subheader("🎯 Estratégia Long & Short")
 
 if len(selected_stocks) >= 2:
-    long_asset = st.sidebar.selectbox(
-        "Ativo LONG:",
-        options=selected_stocks,
-        index=0
-    )
+    long_asset = st.sidebar.selectbox("Ativo LONG:", options=selected_stocks, index=0)
     
     short_options = [s for s in selected_stocks if s != long_asset]
-    short_asset = st.sidebar.selectbox(
-        "Ativo SHORT:",
-        options=short_options,
-        index=0 if short_options else None
-    )
+    short_asset = st.sidebar.selectbox("Ativo SHORT:", options=short_options, index=0 if short_options else None)
     
-    use_optimal_hedge = st.sidebar.checkbox(
-        "Usar hedge ratio ótimo",
-        value=True,
-        help="Calcula o hedge ratio usando regressão linear"
-    )
+    use_optimal_hedge = st.sidebar.checkbox("Usar hedge ratio ótimo", value=True)
     
     if not use_optimal_hedge:
-        hedge_ratio = st.sidebar.slider(
-            "Hedge Ratio manual:",
-            min_value=0.1,
-            max_value=2.0,
-            value=1.0,
-            step=0.1
-        )
+        hedge_ratio = st.sidebar.slider("Hedge Ratio manual:", 0.1, 2.0, 1.0, 0.1)
 
-# Botão para executar análise
+# Botões
 run_analysis = st.sidebar.button("🚀 Executar Análise", type="primary", use_container_width=True)
 
-# Botão para limpar cache
 if st.sidebar.button("🔄 Limpar Cache", use_container_width=True):
     st.cache_data.clear()
     st.sidebar.success("Cache limpo!")
@@ -476,21 +383,17 @@ if st.sidebar.button("🔄 Limpar Cache", use_container_width=True):
 # Main content
 if run_analysis:
     if len(selected_stocks) < 2:
-        st.error("❌ Selecione pelo menos 2 ativos para análise!")
+        st.error("❌ Selecione pelo menos 2 ativos!")
         st.stop()
     
-    # Download dos dados
     st.info("📥 Iniciando processamento dos dados...")
     
     prices_df, failed = download_stock_data_multi_source(
-        selected_stocks,
-        start_date,
-        end_date,
-        use_synthetic=use_synthetic
+        selected_stocks, start_date, end_date, use_synthetic=use_synthetic
     )
     
     if prices_df is None or prices_df.empty:
-        st.error("❌ Não foi possível obter dados para os ativos selecionados.")
+        st.error("❌ Não foi possível obter dados.")
         st.stop()
     
     if failed and not use_synthetic:
@@ -502,18 +405,17 @@ if run_analysis:
         st.error("❌ Menos de 2 ativos disponíveis.")
         st.stop()
     
-    st.success(f"✅ Dados obtidos com sucesso para {len(available_stocks)} ativos!")
+    st.success(f"✅ Dados obtidos para {len(available_stocks)} ativos!")
     
-    # Verificar ativos da estratégia
     if long_asset not in available_stocks:
         long_asset = available_stocks[0]
-        st.info(f"ℹ️ Ativo LONG ajustado para: {long_asset}")
+        st.info(f"ℹ️ Ativo LONG ajustado: {long_asset}")
     
     if short_asset not in available_stocks:
         short_candidates = [s for s in available_stocks if s != long_asset]
         if short_candidates:
             short_asset = short_candidates[0]
-            st.info(f"ℹ️ Ativo SHORT ajustado para: {short_asset}")
+            st.info(f"ℹ️ Ativo SHORT ajustado: {short_asset}")
         else:
             short_asset = None
     
@@ -540,8 +442,9 @@ if run_analysis:
         if stats_data:
             stats_df = pd.DataFrame(stats_data).T
             
+            # Usar estilo simples sem background_gradient
             st.dataframe(
-                stats_df.style.format("{:.2f}").background_gradient(cmap='RdYlGn', axis=0),
+                stats_df.style.format("{:.2f}"),
                 use_container_width=True
             )
             
@@ -559,9 +462,9 @@ if run_analysis:
                         )
         
         st.info(f"""
-        **Período analisado:** {start_date.strftime('%d/%m/%Y')} até {end_date.strftime('%d/%m/%Y')}  
+        **Período:** {start_date.strftime('%d/%m/%Y')} até {end_date.strftime('%d/%m/%Y')}  
         **Dias úteis:** {len(returns_df)}  
-        **Ativos analisados:** {len(prices_df.columns)}
+        **Ativos:** {len(prices_df.columns)}
         """)
     
     # TAB 2: Análise de Preços
@@ -645,7 +548,7 @@ if run_analysis:
         st.plotly_chart(fig4, use_container_width=True)
         
         st.dataframe(
-            corr_matrix.style.format("{:.3f}").background_gradient(cmap='RdBu', vmin=-1, vmax=1),
+            corr_matrix.style.format("{:.3f}"),
             use_container_width=True
         )
     
@@ -654,9 +557,9 @@ if run_analysis:
         st.header("Análise da Estratégia Long & Short")
         
         if short_asset is None:
-            st.error("❌ Não há ativos suficientes para estratégia")
+            st.error("❌ Não há ativos suficientes")
         elif long_asset not in prices_df.columns or short_asset not in prices_df.columns:
-            st.error("❌ Ativos selecionados não disponíveis")
+            st.error("❌ Ativos não disponíveis")
         else:
             if use_optimal_hedge:
                 long_ret = returns_df[long_asset]
@@ -777,7 +680,7 @@ if run_analysis:
                         comparison_df = pd.DataFrame(comparison_data).T
                         
                         st.dataframe(
-                            comparison_df.style.format("{:.2f}").background_gradient(cmap='RdYlGn', axis=0),
+                            comparison_df.style.format("{:.2f}"),
                             use_container_width=True
                         )
 
@@ -788,30 +691,23 @@ else:
     ### 📚 Como usar:
     
     **Fonte de Dados:**
-    - **Tentar dados reais**: Tenta baixar do Yahoo Finance e APIs brasileiras
-    - **Usar dados sintéticos**: Gera dados realistas para demonstração (sempre funciona)
+    - **Tentar dados reais**: Tenta Yahoo Finance e APIs brasileiras
+    - **Usar dados sintéticos**: Gera dados realistas (sempre funciona)
     
-    **Seleção de Ativos:**
-    - Escolha pelo menos 2 ativos da lista
-    - Ou use a opção customizada
-    
-    **Análises Disponíveis:**
-    - 📊 Estatísticas e métricas de performance
-    - 📈 Evolução de preços e retornos
-    - 🔗 Matriz de correlação
-    - 💼 Performance da estratégia Long & Short
+    **Análises:**
+    - 📊 Estatísticas e métricas
+    - 📈 Evolução de preços
+    - 🔗 Correlações
+    - 💼 Performance Long & Short
     
     ### 💡 Dica:
-    
-    Se você está tendo problemas com dados reais, use o **modo sintético** para testar a ferramenta.
-    Os dados sintéticos são gerados com características realistas de mercado!
+    Use o **modo sintético** se tiver problemas com dados reais!
     """)
 
-# Footer
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center'>
     <p>📈 Long & Short Strategy Analyzer</p>
-    <p style='font-size: 0.8em; color: gray;'>Desenvolvido com Streamlit | Apenas para fins educacionais</p>
+    <p style='font-size: 0.8em; color: gray;'>Desenvolvido com Streamlit | Fins educacionais</p>
 </div>
 """, unsafe_allow_html=True)
